@@ -42,28 +42,36 @@ public class DataSourceUtils {
         dataSource1.setPassword("");
         dataSourceMap.put("demo_ds_1", dataSource2);
 
+        ShardingTableRuleConfiguration orderTableRuleConfig = new ShardingTableRuleConfiguration("t_order",
+            "demo_ds_${0..1}.t_order_${0..1}");
+
+        // 配置分库策略
+        orderTableRuleConfig.setDatabaseShardingStrategy(
+            new StandardShardingStrategyConfiguration("user_id", "dbShardingAlgorithm"));
+
+        // 配置分表策略
+        orderTableRuleConfig.setTableShardingStrategy(
+            new StandardShardingStrategyConfiguration("order_id", "tableShardingAlgorithm"));
+
+        // 配置分片规则
         ShardingRuleConfiguration shardingRuleConfig = new ShardingRuleConfiguration();
+        shardingRuleConfig.getTables().add(orderTableRuleConfig);
 
-        // 对t_order表进行分库分表
-        shardingRuleConfig.getTables().add(new ShardingTableRuleConfiguration("t_order"));
-        shardingRuleConfig.getBindingTableGroups().add("t_order");
+        // 配置分库算法
+        Properties dbShardingAlgorithmrProps = new Properties();
+        dbShardingAlgorithmrProps.setProperty("algorithm-expression", "demo_ds_${user_id % 2}");
+        shardingRuleConfig.getShardingAlgorithms().put("dbShardingAlgorithm",
+            new ShardingSphereAlgorithmConfiguration("INLINE", dbShardingAlgorithmrProps));
 
-        // 广播表：暂时不知道是什么用
-        //shardingRuleConfig.getBroadcastTables().add("t_address");
-        // 分库规则
-        shardingRuleConfig.setDefaultDatabaseShardingStrategy(
-            new StandardShardingStrategyConfiguration("user_id", "db_inline"));
-        Properties props = new Properties();
-        props.setProperty("algorithm-expression", "demo_ds_${user_id % 2}");
-        shardingRuleConfig.getShardingAlgorithms().put("db_inline",
-            new ShardingSphereAlgorithmConfiguration("INLINE", props));
+        // 配置分表算法
+        Properties tableShardingAlgorithmrProps = new Properties();
+        tableShardingAlgorithmrProps.setProperty("algorithm-expression", "t_order_${order_id % 2}");
+        shardingRuleConfig.getShardingAlgorithms().put("tableShardingAlgorithm",
+            new ShardingSphereAlgorithmConfiguration("INLINE", tableShardingAlgorithmrProps));
 
-        Properties propertie = new Properties();
-        //是否打印SQL解析和改写日志
-        propertie.setProperty("sql.show", Boolean.TRUE.toString());
         // 获取数据源对象
         return ShardingSphereDataSourceFactory.createDataSource(dataSourceMap,
-            Collections.singleton(shardingRuleConfig), propertie);
+            Collections.singleton(shardingRuleConfig), new Properties());
     }
 }
 
