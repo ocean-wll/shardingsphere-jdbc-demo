@@ -10,6 +10,7 @@ import javax.sql.DataSource;
 
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.shardingsphere.driver.api.ShardingSphereDataSourceFactory;
+import org.apache.shardingsphere.infra.config.algorithm.ShardingSphereAlgorithmConfiguration;
 import org.apache.shardingsphere.sharding.api.config.ShardingRuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.rule.ShardingTableRuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.strategy.sharding.StandardShardingStrategyConfiguration;
@@ -41,27 +42,28 @@ public class DataSourceUtils {
         dataSource1.setPassword("");
         dataSourceMap.put("demo_ds_1", dataSource2);
 
-        // 配置Order表规则
-        ShardingTableRuleConfiguration orderTableRuleConfig = new ShardingTableRuleConfiguration("t_order",
-            "demo_ds_${0..1}.t_order_${0..1}");
-
-        // 配置分库 + 分表策略
-        orderTableRuleConfig.setDatabaseShardingStrategy(
-            new StandardShardingStrategyConfiguration("user_id", "demo_ds_${user_id % 2}"));
-        orderTableRuleConfig.setTableShardingStrategy(
-            new StandardShardingStrategyConfiguration("order_id", "t_order_${order_id % 2}"));
-
-        // 配置分片规则
         ShardingRuleConfiguration shardingRuleConfig = new ShardingRuleConfiguration();
-        shardingRuleConfig.getTables().add(orderTableRuleConfig);
 
-        // 省略配置order_item表规则...
-        // ...
+        // 对t_order表进行分库分表
+        shardingRuleConfig.getTables().add(new ShardingTableRuleConfiguration("t_order"));
+        shardingRuleConfig.getBindingTableGroups().add("t_order");
 
+        // 广播表：暂时不知道是什么用
+        //shardingRuleConfig.getBroadcastTables().add("t_address");
+        // 分库规则
+        shardingRuleConfig.setDefaultDatabaseShardingStrategy(
+            new StandardShardingStrategyConfiguration("user_id", "db_inline"));
+        Properties props = new Properties();
+        props.setProperty("algorithm-expression", "demo_ds_${user_id % 2}");
+        shardingRuleConfig.getShardingAlgorithms().put("db_inline",
+            new ShardingSphereAlgorithmConfiguration("INLINE", props));
+
+        Properties propertie = new Properties();
+        //是否打印SQL解析和改写日志
+        propertie.setProperty("sql.show", Boolean.TRUE.toString());
         // 获取数据源对象
-        DataSource dataSource = ShardingSphereDataSourceFactory.createDataSource(dataSourceMap,
-            Collections.singleton(shardingRuleConfig), new Properties());
-        return dataSource;
+        return ShardingSphereDataSourceFactory.createDataSource(dataSourceMap,
+            Collections.singleton(shardingRuleConfig), propertie);
     }
 }
 
